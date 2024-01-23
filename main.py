@@ -1,42 +1,40 @@
+# необходимые импорты
 import os
 import sys
 
 import pygame
 
-
-# задаем константы
+# константы, которые используются в проекте
 WINDOW_SIZE = WINDOW_WIDTH, WINDOW_HEIGHT = 600, 600
 FPS = 15
 FPS_S = 50
-MAPS_DIR = "maps"
 TILE_SIZE = 40
 ENEMY_EVENT_TYPE = 30
-V = 150
 
-# инициализируем pygame
+# инициализация pygame
 pygame.init()
 screen = pygame.display.set_mode(WINDOW_SIZE)
 pygame.display.set_caption('Том и Джерри')
 clock = pygame.time.Clock()
 
 
-#  функция для выхода из приложения
+# функция, которая отвечает за закрытие программы
 def terminate():
     pygame.quit()
     sys.exit()
 
 
-# функция вывода заключительного экрана
+# функция финального экрана
 def finish_screen():
     all_sprites = pygame.sprite.Group()
     sprite = Picture(all_sprites)
+
     while True:
         screen.fill(pygame.Color('blue'))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 terminate()
-        dx = V * clock.tick() / 1000
-        sprite.update(dx)
+        sprite.update(1)
         all_sprites.draw(screen)
         pygame.display.flip()
         if sprite.rect.x >= 0:
@@ -44,11 +42,11 @@ def finish_screen():
             return
 
 
-# функция вывода стартового экрана и правил игры
+# функция стартового экрана
 def start_screen():
     intro_text = ["ПРАВИЛА ИГРЫ:", "",
                   "Задача мышонка Джерри",
-                  "добраться до норки и",
+                  "добраться до норки и,",
                   "не быть съеденным котом",
                   "Томом. Управляйте",
                   "мышонком клавишами",
@@ -69,6 +67,7 @@ def start_screen():
         intro_rect.x = 10
         text_coords += intro_rect.height
         screen.blit(string_rendered, intro_rect)
+
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -80,9 +79,9 @@ def start_screen():
         clock.tick(FPS_S)
 
 
-# функция загрузки изображений
+# функция для загрузки изображения
 def load_image(name, colorkey=None):
-    fullname = os.path.join('images', name)
+    fullname = os.path.join('/home/gruand69/Dev/tom_and_jerry/images', name)
     if not os.path.isfile(fullname):
         print(f'Файл с изображением "{fullname}" не найден')
         sys.exit()
@@ -96,10 +95,10 @@ def load_image(name, colorkey=None):
         image = image.convert_alpha()
     return image
 
- 
+
 class Picture(pygame.sprite.Sprite):
-    '''Класс для загрузки
-      финального экрана'''
+    '''Класс, создающий спрайт
+    изображения.'''
     image = pygame.transform.scale(load_image("picture.jpg"),
                                    (WINDOW_WIDTH, WINDOW_HEIGHT))
 
@@ -115,12 +114,13 @@ class Picture(pygame.sprite.Sprite):
             self.rect.x += dx
 
 
-class Board:
-    '''Класс для загрузки
-      отображения карты игры'''
+class Labyrinth:
+    '''Класс, создающий игровое
+    поле.'''
     def __init__(self, filename, free_tiles, finish_tile) -> None:
         self.map = []
-        with open(f"{MAPS_DIR}/{filename}") as input_file:
+        with open(os.path.join('/home/gruand69/Dev/tom_and_jerry/maps',
+                               filename)) as input_file:
             for line in input_file:
                 self.map.append(list(map(int, line.split())))
         self.height = len(self.map)
@@ -142,7 +142,7 @@ class Board:
                 delta = (image.get_width() - TILE_SIZE) // 2
                 screen.blit(image, (x * TILE_SIZE - delta,
                                     y * TILE_SIZE - delta))
-    
+
     def get_tile_id(self, position):
         return self.map[position[1]][position[0]]
 
@@ -174,8 +174,8 @@ class Board:
         return x, y
 
 
-class Mouse:
-    '''Класс для отображения мышонка Джерри'''
+class Hero:
+    '''Класс, создающий мышонка.'''
     def __init__(self, pic, position) -> None:
         self.x, self.y = position
         self.image = pygame.transform.scale(load_image(pic, -1),
@@ -194,7 +194,7 @@ class Mouse:
 
 
 class Enemy:
-    '''Класс для отображения кота Тома'''
+    '''Класс, создающий кота.'''
     def __init__(self, pic, position) -> None:
         self.x, self.y = position
         self.delay = 200
@@ -215,14 +215,14 @@ class Enemy:
 
 
 class Game:
-    '''Класс для отображения игры'''
-    def __init__(self, board, hero, enemy) -> None:
-        self.board = board
+    '''Класс, объединяющий созданные классы.'''
+    def __init__(self, labyrinth, hero, enemy) -> None:
+        self.labyrinth = labyrinth
         self.hero = hero
         self.enemy = enemy
 
     def render(self, screen):
-        self.board.render(screen)
+        self.labyrinth.render(screen)
         self.hero.render(screen)
         self.enemy.render(screen)
 
@@ -236,24 +236,25 @@ class Game:
             next_y -= 1
         if pygame.key.get_pressed()[pygame.K_DOWN]:
             next_y += 1
-        if self.board.is_free((next_x, next_y)):
+        if self.labyrinth.is_free((next_x, next_y)):
             self.hero.set_position((next_x, next_y))
 
     def move_enemy(self):
-        next_position = self.board.find_path_step(
+        next_position = self.labyrinth.find_path_step(
             self.enemy.get_position(),
             self.hero.get_position()
         )
         self.enemy.set_position(next_position)
 
     def check_win(self):
-        return (self.board.get_tile_id(self.hero.get_position())
-                == self.board.finish_tile)
+        return (self.labyrinth.get_tile_id(self.hero.get_position())
+                == self.labyrinth.finish_tile)
 
     def check_lose(self):
         return self.hero.get_position() == self.enemy.get_position()
 
-# функция для вывода сообщения о результате игры
+
+# функция, выводящая сообщение
 def show_message(screen, message):
     font = pygame.font.Font(None, 50)
     text = font.render(message, 1, (50, 70, 0))
@@ -267,36 +268,54 @@ def show_message(screen, message):
     screen.blit(text, (text_x, text_y))
 
 
-# основная функция приложения
+# список списков с параметрами уровней игры
+stages = [
+    ["simple_map1.txt", "hero.png", (7, 7), "enemy.png", (1, 7)],
+    ["simple_map.txt", "hero.png", (7, 7), "enemy.png", (1, 7)],
+    ["simple_map2.txt", "hero.png", (7, 7), "enemy.png", (1, 7)]
+]
+
+
+# основная функция программы
 def main():
     start_screen()
-    board = Board("simple_map1.txt", [0, 2], 2)
-    hero = Mouse("hero.png", (7, 7))
-    enemy = Enemy("enemy.png", (1, 7))
-    game = Game(board, hero, enemy)
-    running = True
-    game_over = False
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                terminate()
-            if event.type == ENEMY_EVENT_TYPE and not game_over:
-                game.move_enemy()
-        if not game_over:
-            game.update_hero()
-        screen.fill((0, 0, 0))
-        game.render(screen)
-        if game.check_win():
-            game_over = True
-            show_message(screen, "Вы выиграли!")
-            running = False
-        if game.check_lose():
-            game_over = True
-            show_message(screen, "Вы проиграли!")
-            running = False
-        pygame.display.flip()
-        clock.tick(FPS)
-    pygame.time.delay(3000)
+    for i, stage in enumerate(stages):
+        labyrinth = Labyrinth(stage[0], [0, 2], 2)
+        hero = Hero(stage[1], stage[2])
+        enemy = Enemy(stage[3], stage[4])
+        game = Game(labyrinth, hero, enemy)
+        running = True
+        game_over = False
+        has_lost = False
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    terminate()
+                if event.type == ENEMY_EVENT_TYPE and not game_over:
+                    game.move_enemy()
+            if not game_over:
+                game.update_hero()
+            screen.fill((0, 0, 0))
+            game.render(screen)
+            if game.check_win():
+                game_over = True
+                if i < len(stages) - 1:
+                    show_message(screen, "Следующий этап!")
+                else:
+                    show_message(screen, "Вы выиграли!")
+                running = False
+            if game.check_lose():
+                game_over = True
+                show_message(screen, "Вы проиграли!")
+                running = False
+                has_lost = True
+            pygame.display.flip()
+            clock.tick(FPS)
+        pygame.time.delay(1000)
+        if has_lost:
+            pygame.time.delay(1000)
+            break
+
     finish_screen()
     terminate()
 
